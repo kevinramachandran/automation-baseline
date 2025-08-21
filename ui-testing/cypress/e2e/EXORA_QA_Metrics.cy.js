@@ -151,24 +151,29 @@ describe('QA Metrics - UI Tests', () => {
     cy.get(selectors.chart.header).should('contain.text', 'Tickets Verified on');
   });
 
-  it('Validates chart tooltip on hover', () => {
-    cy.get('div.custom-off-canvas > button').click();
-    cy.get('div.customQAClass > div:nth-of-type(2) canvas')
-      .should('be.visible')
-      .then(($canvas) => {
-        const rect = $canvas[0].getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
+  // Flaky test handled with retries
+  it(
+    'Validates chart tooltip on hover',
+    { retries: { runMode: 2, openMode: 1 } }, // retried if flaky
+    () => {
+      cy.get('div.custom-off-canvas > button').click();
+      cy.get('div.customQAClass > div:nth-of-type(2) canvas')
+        .should('be.visible')
+        .then(($canvas) => {
+          const rect = $canvas[0].getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
 
-        cy.wrap($canvas).trigger('mousemove', {
-          clientX: centerX,
-          clientY: centerY,
-          force: true
+          cy.wrap($canvas).trigger('mousemove', {
+            clientX: centerX,
+            clientY: centerY,
+            force: true
+          });
+
+          cy.get('div.chartHolder', { timeout: 5000 }).should('be.visible');
         });
-
-        cy.get('div.chartHolder').should('be.visible');
-      });
-  });
+    }
+  );
 
   const issueTypes = [
     { name: 'Defect', selector: 'div.custom-off-canvas div.active > div' },

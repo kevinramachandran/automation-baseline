@@ -65,3 +65,16 @@ describe('Sample Test', () => {
 
 ##  Learn More
 - [Cypress Documentation](https://docs.cypress.io/)
+
+# Cypress QA Metrics Automation
+
+This project automates UI testing for the **QA Metrics dashboard** using Cypress.
+
+## Features
+- Automated login and navigation
+- Filter application (Project, Sprint, Issue Type, Priority)
+- Validation of chart header, tooltips, and counts
+- Handling of flaky tests using Cypress retries
+
+## Project Structure
+
