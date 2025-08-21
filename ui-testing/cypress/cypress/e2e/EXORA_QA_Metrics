@@ -1,89 +1,18 @@
-describe('QA Metrics Charts', () => {
-  let creds;
+/// <reference types="cypress" />
 
-  before(() => {
-    cy.fixture('credentials').then((data) => {
-      creds = data;
-    });
-  });
+/**
+ * QA Metrics Dashboard - API & UI Tests
+ */
 
-  it('should visit example page and interact with qa metrics', () => {
-    cy.viewport(1351, 462);
-    cy.visit(creds.baseUrl);
-
-    // Login
-    cy.get("#login_form > div:nth-of-type(1) input").type(creds.username);
-    cy.get("#login_form > div:nth-of-type(2) input").type(creds.password);
-    cy.get("#loginBtn").click();
-
-    // Login Success
-    cy.log('Success Login');
-    cy.get("li:nth-of-type(2) img").click();
-
-    cy.log('Navigate to the Flow Metrics');
-
-    cy.get('header.sidebar-header', { timeout: 10000 }).should('be.visible');
-
-    // Opening the Navigation
-    cy.get('header.sidebar-header')
-      .invoke('removeClass', 'collapsed')
-      .invoke('addClass', 'expanded');
-
-    // Select the DevopsInsights flow metrics pages
-    cy.get("div.top_Header span").click();
-
-    // Click on the first timeline link
-    cy.get("div.connected-timeline > div:nth-of-type(2) a", { timeout: 10000 })
-      .should('be.visible')
-      .click();
-
-    cy.get('.echarts-for-react')
-      .should('have.length.at.least', 1)
-      .first()
-      .find('canvas')
-      .should('be.visible')
-      .and(($canvas) => {
-        expect($canvas.width()).to.be.greaterThan(0);
-        expect($canvas.height()).to.be.greaterThan(0);
-      });
-
-    cy.wait(3000);
-
-    cy.fixture('DIFilters').then((data) => {
-      cy.get("svg").click();
-      cy.get("#root button").click();
-      cy.get("span:nth-of-type(2) div.select-value").click();
-      cy.get("li.selectAllOptionClass > span").click();
-
-      cy.get('input[placeholder="Start Date/End Date"]')
-        .should('be.visible')
-        .clear()
-        .type(`${data.date}{enter}`);
-
-      cy.get("#root button").click();
-
-      cy.wait(6000);
-      cy.screenshot('qa-metrics-chart');
-    });
-  });
-});
-
-
-describe('QA Metrics Main dashboard data output Tests', () => {
+describe('QA Metrics - API Tests', () => {
   let creds;
 
   const commonHeaders = {
     Accept: 'application/json',
-    'Accept-Language': 'en-US,en;q=0.9,ml;q=0.8',
-    Connection: 'keep-alive',
     'Content-Type': 'application/json',
-    DNT: '1',
     'DTOP-API-TOKEN': 'fkO9eqvBkAwC2jLDsMY9L7Cnm9TGJEsXDudllrWLfFI=',
     Origin: 'https://sit.exora.devopslabs.tech',
-    Referer: 'https://sit.exora.devopslabs.tech/DevOpsInsights/QAMetrics',
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'cors',
-    'Sec-Fetch-Site': 'same-origin'
+    Referer: 'https://sit.exora.devopslabs.tech/DevOpsInsights/QAMetrics'
   };
 
   const requestBodyWithDateRange = {
@@ -104,79 +33,161 @@ describe('QA Metrics Main dashboard data output Tests', () => {
     });
   });
 
-  it('Gets Tickets Verified and Bugs Created Trend Chart', () => {
-    cy.request({
-      method: 'POST',
-      url: `${creds.baseUrl.replace('/auth', '')}/backend/api/v1/QAMetrics/getTicketsVerifiedAndBugCreatedTrendChart`,
-      headers: commonHeaders,
-      body: requestBodyWithDateRange
-    }).then((response) => {
-      expect(response.status).to.eq(200);
-      cy.writeFile('cypress/reports/QA_ticketsVerifiedAndBugs.json', response.body);
+  const apiTests = [
+    {
+      name: 'Tickets Verified and Bugs Created Trend Chart',
+      endpoint: 'getTicketsVerifiedAndBugCreatedTrendChart',
+      body: requestBodyWithDateRange,
+      file: 'QA_ticketsVerifiedAndBugs.json'
+    },
+    {
+      name: 'Tickets Created on Current Day',
+      endpoint: 'getTicketsCreatedOnCurrentDay',
+      body: { ...requestBodyWithDateRange, fromDate: null, toDate: null },
+      file: 'QA_ticketsCreatedOnCurrentDay.json'
+    },
+    {
+      name: 'Bugs Created by Severity on Current Day',
+      endpoint: 'getBugsCreatedSeverityOnCurrentDay',
+      body: { ...requestBodyWithDateRange, fromDate: null, toDate: null },
+      file: 'QA_todayBugsCratedBySeverity.json'
+    },
+    {
+      name: 'Bugs Created by Severity in Date Range',
+      endpoint: 'getBugsCreatedSeverityOnGivenDateRange',
+      body: requestBodyWithDateRange,
+      file: 'QA_bugsCratedBySeverity.json'
+    },
+    {
+      name: 'Tickets Verified in Date Range',
+      endpoint: 'getTicketsVerifiedOnGivenDateRange',
+      body: requestBodyWithDateRange,
+      file: 'QA_verifiedTicketDate.json'
+    }
+  ];
+
+  apiTests.forEach(({ name, endpoint, body, file }) => {
+    it(`Fetches ${name}`, () => {
+      cy.request({
+        method: 'POST',
+        url: `${creds.baseUrl.replace('/auth', '')}/backend/api/v1/QAMetrics/${endpoint}`,
+        headers: commonHeaders,
+        body
+      }).then((response) => {
+        expect(response.status).to.eq(200);
+        cy.writeFile(`cypress/reports/${file}`, response.body);
+      });
     });
   });
+});
 
-  it('Fetches Tickets Created on Current Day', () => {
-    cy.request({
-      method: 'POST',
-      url: `${creds.baseUrl.replace('/auth', '')}/backend/api/v1/QAMetrics/getTicketsCreatedOnCurrentDay`,
-      headers: commonHeaders,
-      body: {
-        projects: ['Architecture Compliance', 'C Advisor360'],
-        sprints: [],
-        issueTypes: [],
-        priorities: [],
-        status: [],
-        assignee: [],
-        reporter: []
+
+/**
+ * QA Metrics - UI Tests
+ */
+describe('QA Metrics - UI Tests', () => {
+  const selectors = {
+    login: {
+      username: '#login_form > div:nth-of-type(1) input',
+      password: '#login_form > div:nth-of-type(2) input',
+      button: '#loginBtn'
+    },
+    sidebar: {
+      qaMetricsMenu: 'li:nth-of-type(5) img',
+      subMenu: 'li:nth-of-type(2) div.nav-item-text'
+    },
+    filters: {
+      project: 'div.devops-filter-container > div:nth-of-type(1) div.select-value',
+      sprint: 'div.devops-filter-container > div:nth-of-type(2) div.select-value',
+      issueType: 'div.devops-filter-container > div:nth-of-type(3) div.select-value',
+      priority: 'div.devops-filter-container > div:nth-of-type(4) div.select-value',
+      applyBtn: 'div:nth-of-type(7) > button'
+    },
+    chart: {
+      canvas: '.echarts-for-react canvas',
+      header: 'div.customQAClass h4'
+    },
+    defectCount: {
+      leftPanel: 'div.custom-off-canvas div.active > div',
+      mainPanel: 'div.dashcol.bg-white.mt-3 strong:nth-child(3)'
+    }
+  };
+
+  beforeEach(() => {
+    cy.viewport(1366, 768);
+    cy.visit('https://sit.exora.devopslabs.tech/auth');
+
+    // Login
+    cy.get(selectors.login.username).type('adarsh');
+    cy.get(selectors.login.password).type('therssparrow@9365');
+    cy.get(selectors.login.button).click();
+
+    // Navigate to QA Metrics
+    cy.get(selectors.sidebar.qaMetricsMenu, { timeout: 10000 }).click();
+    cy.get(selectors.sidebar.subMenu).click();
+    cy.get("div.connected-timeline > div:nth-of-type(2) a").click();
+
+    // Apply filters
+    [selectors.filters.project, selectors.filters.sprint, selectors.filters.issueType, selectors.filters.priority].forEach(
+      (filter) => {
+        cy.get(filter).click();
+        cy.get('li.selectAllOptionClass > span').click();
       }
-    }).then((response) => {
-      expect(response.status).to.eq(200);
-      cy.writeFile('cypress/reports/QA_ticketsCreatedOnCurrentDay.json', response.body);
-    });
+    );
+    cy.get(selectors.filters.applyBtn).click();
+    cy.wait(3000);
   });
 
-  it('Fetches Bugs Created by Severity on Current Day', () => {
-    cy.request({
-      method: 'POST',
-      url: `${creds.baseUrl.replace('/auth', '')}/backend/api/v1/QAMetrics/getBugsCreatedSeverityOnCurrentDay`,
-      headers: commonHeaders,
-      body: {
-        projects: ['Architecture Compliance', 'C Advisor360'],
-        sprints: [],
-        issueTypes: [],
-        priorities: [],
-        status: [],
-        assignee: [],
-        reporter: []
-      }
-    }).then((response) => {
-      expect(response.status).to.eq(200);
-      cy.writeFile('cypress/reports/QA_todayBugsCratedBySeverity.json', response.body);
-    });
+  it('Verifies header contains "Tickets Verified"', () => {
+    cy.get(selectors.chart.header).should('contain.text', 'Tickets Verified on');
   });
 
-  it('Gets Bugs Created by Severity in Given Date Range', () => {
-    cy.request({
-      method: 'POST',
-      url: `${creds.baseUrl.replace('/auth', '')}/backend/api/v1/QAMetrics/getBugsCreatedSeverityOnGivenDateRange`,
-      headers: commonHeaders,
-      body: requestBodyWithDateRange
-    }).then((response) => {
-      expect(response.status).to.eq(200);
-      cy.writeFile('cypress/reports/QA_bugsCratedBySeverity.json', response.body);
-    });
+  it('Validates chart tooltip on hover', () => {
+    cy.get('div.custom-off-canvas > button').click();
+    cy.get('div.customQAClass > div:nth-of-type(2) canvas')
+      .should('be.visible')
+      .then(($canvas) => {
+        const rect = $canvas[0].getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        cy.wrap($canvas).trigger('mousemove', {
+          clientX: centerX,
+          clientY: centerY,
+          force: true
+        });
+
+        cy.get('div.chartHolder').should('be.visible');
+      });
   });
 
-  it('Gets Tickets Verified in Given Date Range', () => {
-    cy.request({
-      method: 'POST',
-      url: `${creds.baseUrl.replace('/auth', '')}/backend/api/v1/QAMetrics/getTicketsVerifiedOnGivenDateRange`,
-      headers: commonHeaders,
-      body: requestBodyWithDateRange
-    }).then((response) => {
-      expect(response.status).to.eq(200);
-      cy.writeFile('cypress/reports/QA_verifiedTicketDate.json', response.body);
+  const issueTypes = [
+    { name: 'Defect', selector: 'div.custom-off-canvas div.active > div' },
+    { name: 'Task', selector: 'div.custom-off-canvas div:nth-of-type(3) > div div:nth-of-type(3) > div' },
+    { name: 'Feature', selector: 'div.custom-off-canvas > div > div > div:nth-of-type(2) > div div:nth-of-type(2) > div' },
+    { name: 'Epic', selector: 'div.custom-off-canvas div:nth-of-type(1) > div' },
+    { name: 'Change Request', selector: 'div.custom-off-canvas div:nth-of-type(5) > div' },
+    { name: 'Technical Debt', selector: 'div.custom-off-canvas div:nth-of-type(6) > div' }
+  ];
+
+  issueTypes.forEach(({ name, selector }) => {
+    it(`Validates count for ${name}`, () => {
+      cy.get(selector).click();
+      cy.wait(2000);
+
+      cy.get('div.custom-off-canvas.offcanvas-end.show h4')
+        .first()
+        .invoke('text')
+        .then((text1) => {
+          const leftPanelCount = parseInt(text1);
+
+          cy.get(selectors.defectCount.mainPanel)
+            .invoke('text')
+            .then((text2) => {
+              const mainPanelCount = parseInt(text2);
+              expect(leftPanelCount).to.equal(mainPanelCount);
+            });
+        });
     });
   });
 });
