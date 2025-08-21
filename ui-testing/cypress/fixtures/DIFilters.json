@@ -1,0 +1,4 @@
+{
+  "date": "01/06/2025 - 21/08/2025",
+  "stages": " 'SIT Ready Verification', 'SIT Verification', 'SIT Failed', 'UAT Ready Verification', 'UAT Verification', 'UAT Failed', 'PROD Ready Verification', 'PROD Verification', 'Review Pending' "
+}
