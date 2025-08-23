@@ -1,6 +1,6 @@
 describe("Sauce Lab Testing", () => {
 
-    it.skip("Login Testing", () => {
+    it("Login Testing", () => {
 
         cy.visit("https://www.saucedemo.com/");
 
